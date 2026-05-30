@@ -14,4 +14,10 @@ declare module 'osc' {
     send(message: Record<string, unknown>): void;
     on(event: string, callback: (...args: unknown[]) => void): void;
   }
+
+  const osc: {
+    UDPPort: typeof UDPPort;
+  };
+
+  export default osc;
 }

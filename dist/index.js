@@ -32,8 +32,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const toolInput = (args || {});
     try {
         // Check if Ableton is connected
-        const isConnected = await osc.isConnected();
-        if (!isConnected) {
+        const abetonConnected = await osc.healthCheck();
+        if (!abetonConnected) {
+            const status = osc.getConnectionStatus();
             return {
                 content: [
                     {
@@ -41,6 +42,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         text: JSON.stringify({
                             success: false,
                             error: 'Ableton Live is not connected. Please start Ableton with AbletonOSC Remote Script enabled.',
+                            debugInfo: {
+                                oscStatus: status,
+                                message: `Cannot reach Ableton on 127.0.0.1:${status.remotePort}`,
+                            },
                         }),
                     },
                 ],
@@ -98,7 +103,7 @@ async function main() {
         await osc.connect();
         console.error('OSC Client connected to Ableton');
         // Check connection
-        const connected = await osc.isConnected();
+        const connected = await osc.healthCheck();
         if (!connected) {
             console.error('Warning: Could not reach Ableton. Make sure Ableton Live is running with AbletonOSC Remote Script enabled.');
         }

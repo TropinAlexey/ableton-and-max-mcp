@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+.env
+.env.local
+*.log
+*.swp
+*.swo
+*~
+.DS_Store
