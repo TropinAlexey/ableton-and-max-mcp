@@ -10,7 +10,9 @@
     "dev": "tsc && node dist/index.js",
     "watch": "tsc --watch",
     "test:local": "tsc && DEBUG=true node dist/test-local.js",
-    "test:clips-notes": "tsc && DEBUG=true node dist/test-clips-notes.js"
+    "test:clips-notes": "tsc && DEBUG=true node dist/test-clips-notes.js",
+    "test:devices-max": "tsc && DEBUG=true node dist/test-devices-max.js",
+    "test:all": "npm run test:local && npm run test:clips-notes && npm run test:devices-max"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
