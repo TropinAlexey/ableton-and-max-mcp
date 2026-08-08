@@ -1,6 +1,8 @@
 # Ableton Live + Max for Live MCP Server
 
 > **Production-grade, zero-latency** MCP (Model Context Protocol) server for controlling Ableton Live and Max for Live directly from Claude AI.
+>
+> **v2.0** — upgraded to MCP SDK v2 (spec `2026-07-28`): stateless protocol, `McpServer` + `registerTool` API, Zod v4 schemas.
 
 [![GitHub](https://img.shields.io/badge/GitHub-TropinAlexey%2Fableton--and--max--mcp-blue)](https://github.com/TropinAlexey/ableton-and-max-mcp)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
@@ -61,7 +63,7 @@ Edit `~/.config/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Code → 42 new tools available!
+Restart Claude Code → 40 tools available!
 
 ## Architecture
 
@@ -71,7 +73,7 @@ Restart Claude Code → 42 new tools available!
 │         (MCP Client / Conversation Interface)            │
 └─────────────────────────────────────────────────────────┘
                            ↓
-                    MCP Protocol (JSON-RPC 2.0)
+                    MCP Protocol 2026-07-28 (JSON-RPC 2.0)
                            ↓
 ┌─────────────────────────────────────────────────────────┐
 │          Ableton MCP Server (Bun Runtime)                │
@@ -91,9 +93,9 @@ Restart Claude Code → 42 new tools available!
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Available Tools (42 Total)
+## Available Tools (40 Total)
 
-### 🎵 Transport Control (7 tools)
+### 🎵 Transport Control (6 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -103,7 +105,6 @@ Restart Claude Code → 42 new tools available!
 | `transport_record` | Enable recording mode |
 | `transport_set_tempo` | Set BPM (20-300) |
 | `transport_jump_to` | Jump to bar position |
-| `transport_set_time_signature` | Set time signature (requires M4L device) |
 
 ### 🎼 Track Management (13 tools)
 
@@ -113,7 +114,7 @@ Restart Claude Code → 42 new tools available!
 | `tracks_create_midi` | Create new MIDI track |
 | `tracks_create_audio` | Create new audio track |
 | `tracks_delete` | Delete track by index |
-| `tracks_set_name` | Rename track |
+| `tracks_rename` | Rename track |
 | `tracks_set_volume` | Set volume (0.0-1.0) |
 | `tracks_set_pan` | Set pan (-1.0 to 1.0) |
 | `tracks_mute` | Mute track |
@@ -123,18 +124,17 @@ Restart Claude Code → 42 new tools available!
 | `tracks_arm` | Arm for recording |
 | `tracks_disarm` | Disarm recording |
 
-### 📎 Clip Control (8 tools)
+### 📎 Clip Control (7 tools)
 
 | Tool | Description |
 |------|-------------|
 | `clips_list` | List clips in track |
 | `clips_create` | Create new MIDI clip |
-| `clips_delete` | Delete clip |
 | `clips_fire` | Start playing clip |
 | `clips_stop` | Stop clip |
+| `clips_duplicate` | Duplicate clip |
 | `clips_set_name` | Rename clip |
 | `clips_set_length` | Set clip length in bars |
-| `clips_duplicate` | Duplicate clip to another scene |
 
 ### 🎹 MIDI Notes + Pattern Generation (5 tools)
 
@@ -237,11 +237,8 @@ Total: 1,245 lines of production JavaScript
 
 ### Tool Dispatch
 ```javascript
-// Before: O(n) string prefix checks
-if (toolName.startsWith('transport_')) { ... }
-
-// After: O(1) Map lookup
-const executor = toolExecutors.get(toolName);
+// v2: declarative registration, SDK handles dispatch internally
+server.registerTool('transport_play', config, handler);
 ```
 
 ### Memory
@@ -305,6 +302,26 @@ bun run src/index.js
 npm start
 ```
 
+## Changelog
+
+### v2.0.0
+
+Upgraded to **MCP SDK v2** (`@modelcontextprotocol/server@2.0.0`) aligned with MCP specification `2026-07-28`.
+
+**Breaking changes:**
+- Requires Node.js 18+ or Bun 1.0+
+- Dependency changed: `@modelcontextprotocol/sdk` → `@modelcontextprotocol/server` + `zod@4`
+
+**What changed:**
+- **Stateless protocol** — no more `initialize`/`notifications/initialized` handshake; protocol version and capabilities sent per-request via `_meta`
+- **`McpServer` + `registerTool` API** — replaced manual `Server` + `setRequestHandler(ListToolsRequestSchema/CallToolRequestSchema)` with declarative per-tool registration
+- **Zod v4 schemas** — tool input schemas defined with Zod v4 (Standard Schema) instead of raw JSON Schema objects
+- **Cleaner architecture** — each tool module exports a tools config object + executor function; no more `createXxxTools()` / `executeXxxTool()` split pattern with separate TOOLS arrays
+
+### v1.0.0
+
+Initial release with 42 MCP tools for Ableton Live + Max for Live control.
+
 ## Limitations & Future Work
 
 ### Current Limitations
@@ -343,7 +360,7 @@ MIT © Alexey Tropin
 
 - **GitHub**: https://github.com/TropinAlexey/ableton-and-max-mcp
 - **Claude Code Guide**: https://github.com/anthropics/claude-code
-- **MCP Specification**: https://modelcontextprotocol.io/
+- **MCP Specification**: https://modelcontextprotocol.io/specification/2026-07-28
 - **Ableton Live API**: https://github.com/gluon/AbletonOSC
 - **Max for Live**: https://www.ableton.com/en/live/max-for-live/
 
