@@ -1,25 +1,17 @@
 {
   "name": "ableton-and-max-mcp",
-  "version": "0.1.0",
-  "description": "MCP server for Ableton Live + Max for Live",
-  "main": "dist/index.js",
+  "version": "2.0.0",
+  "description": "Industrial-grade MCP server for Ableton Live + Max for Live (zero-latency)",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsc && node dist/index.js",
-    "watch": "tsc --watch",
-    "test:local": "tsc && DEBUG=true node dist/test-local.js",
-    "test:clips-notes": "tsc && DEBUG=true node dist/test-clips-notes.js",
-    "test:devices-max": "tsc && DEBUG=true node dist/test-devices-max.js",
-    "test:all": "npm run test:local && npm run test:clips-notes && npm run test:devices-max"
+    "start": "bun run src/index.js",
+    "dev": "bun run --watch src/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "osc": "^2.4.4"
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.4.3"
   },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "typescript": "^5.3.3"
+  "engines": {
+    "bun": ">=1.0.0"
   }
 }
