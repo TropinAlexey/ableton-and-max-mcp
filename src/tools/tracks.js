@@ -1,51 +1,51 @@
 import { z } from 'zod/v4';
 
 const trackIndexSchema = z.object({
-  index: z.number().describe('Track index'),
+  index: z.number().int().min(0).describe('Track index (0-based)'),
 });
 
 export const tracksTools = {
   tracks_list: {
-    description: 'List all tracks',
+    description: 'List all tracks with names, volumes, pans, and states',
     inputSchema: z.object({}),
   },
   tracks_create_midi: {
-    description: 'Create MIDI track',
+    description: 'Create a new MIDI track. Use tracks_list after to get the actual index.',
     inputSchema: z.object({
       name: z.string().optional().describe('Track name'),
-      index: z.number().optional().describe('Position'),
+      index: z.number().int().min(0).optional().describe('Insert position (0-based). Omit to append at end.'),
     }),
   },
   tracks_create_audio: {
-    description: 'Create audio track',
+    description: 'Create a new audio track. Use tracks_list after to get the actual index.',
     inputSchema: z.object({
       name: z.string().optional().describe('Track name'),
-      index: z.number().optional().describe('Position'),
+      index: z.number().int().min(0).optional().describe('Insert position (0-based). Omit to append at end.'),
     }),
   },
   tracks_delete: {
-    description: 'Delete track',
+    description: 'Permanently delete a track. Cannot be undone. Use tracks_list to verify the index first.',
     inputSchema: trackIndexSchema,
   },
   tracks_rename: {
-    description: 'Rename track',
+    description: 'Rename a track',
     inputSchema: z.object({
-      index: z.number().describe('Track index'),
+      index: z.number().int().min(0).describe('Track index (0-based)'),
       name: z.string().describe('New name'),
     }),
   },
   tracks_set_volume: {
-    description: 'Set track volume (0-1)',
+    description: 'Set track volume',
     inputSchema: z.object({
-      index: z.number().describe('Track index'),
-      volume: z.number().describe('Volume 0-1'),
+      index: z.number().int().min(0).describe('Track index (0-based)'),
+      volume: z.number().min(0).max(1).describe('Volume 0.0 (silent) to 1.0 (full)'),
     }),
   },
   tracks_set_pan: {
-    description: 'Set track pan (-1 to 1)',
+    description: 'Set track pan',
     inputSchema: z.object({
-      index: z.number().describe('Track index'),
-      pan: z.number().describe('Pan -1 to 1'),
+      index: z.number().int().min(0).describe('Track index (0-based)'),
+      pan: z.number().min(-1).max(1).describe('Pan: -1.0 (left) to 1.0 (right), 0 = center'),
     }),
   },
   tracks_mute: {
@@ -57,11 +57,11 @@ export const tracksTools = {
     inputSchema: trackIndexSchema,
   },
   tracks_solo: {
-    description: 'Solo track',
+    description: 'Solo track (mutes all other tracks)',
     inputSchema: trackIndexSchema,
   },
   tracks_unsolo: {
-    description: 'Unsolo track',
+    description: 'Remove solo from track',
     inputSchema: trackIndexSchema,
   },
   tracks_arm: {
@@ -69,7 +69,7 @@ export const tracksTools = {
     inputSchema: trackIndexSchema,
   },
   tracks_disarm: {
-    description: 'Disarm track',
+    description: 'Disarm track (stop recording)',
     inputSchema: trackIndexSchema,
   },
 };
@@ -89,14 +89,14 @@ export async function executeTracksTool(osc, name, input) {
         input.index ?? -1,
         input.name || 'MIDI Track',
       ]);
-      return { success: true };
+      return { success: true, inserted_at: input.index ?? 'end' };
 
     case 'tracks_create_audio':
       osc.send('/live/song/create_audio_track', [
         input.index ?? -1,
         input.name || 'Audio Track',
       ]);
-      return { success: true };
+      return { success: true, inserted_at: input.index ?? 'end' };
 
     case 'tracks_delete':
       osc.send('/live/tracks', [idx, 'delete']);
@@ -107,14 +107,10 @@ export async function executeTracksTool(osc, name, input) {
       return { success: true };
 
     case 'tracks_set_volume':
-      if (input.volume < 0 || input.volume > 1)
-        return { success: false, error: 'Volume must be 0-1' };
       osc.send('/live/tracks', [idx, 'set', 'volume', input.volume]);
       return { success: true };
 
     case 'tracks_set_pan':
-      if (input.pan < -1 || input.pan > 1)
-        return { success: false, error: 'Pan must be -1 to 1' };
       osc.send('/live/tracks', [idx, 'set', 'pan', input.pan]);
       return { success: true };
 

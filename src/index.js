@@ -65,20 +65,29 @@ for (const { tools, exec } of toolModules) {
   }
 }
 
+function shutdown() {
+  console.error('Shutting down...');
+  osc.disconnect();
+  process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
 async function main() {
   try {
     await osc.connect();
-    console.error('✓ OSC connected');
+    console.error('OSC connected');
 
     const connected = await osc.healthCheck();
     if (!connected) {
-      console.error('⚠ Warning: Ableton unreachable. Start with AbletonOSC enabled.');
+      console.error('Warning: Ableton unreachable. Start with AbletonOSC enabled.');
     }
 
     await serveStdio(server);
-    console.error('✓ MCP server running (v2.0)');
+    console.error('MCP server running (v2.0)');
   } catch (error) {
-    console.error('✗ Fatal:', error.message);
+    console.error('Fatal:', error.message);
     process.exit(1);
   }
 }

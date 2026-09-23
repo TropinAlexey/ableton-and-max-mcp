@@ -1,20 +1,24 @@
 # Ableton Live + Max for Live MCP Server
 
-> **Production-grade, zero-latency** MCP (Model Context Protocol) server for controlling Ableton Live and Max for Live directly from Claude AI.
+> **Production-grade, zero-latency** MCP (Model Context Protocol) server for controlling Ableton Live and Max for Live from any AI agent.
 >
 > **v2.0** — upgraded to MCP SDK v2 (spec `2026-07-28`): stateless protocol, `McpServer` + `registerTool` API, Zod v4 schemas.
 
 [![GitHub](https://img.shields.io/badge/GitHub-TropinAlexey%2Fableton--and--max--mcp-blue)](https://github.com/TropinAlexey/ableton-and-max-mcp)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-2026--07--28-purple)](https://modelcontextprotocol.io)
+[![Bun](https://img.shields.io/badge/Runtime-Bun-f9f1e1)](https://bun.sh)
+[![Node](https://img.shields.io/badge/Node.js-18%2B-339933)](https://nodejs.org)
+[![Tools](https://img.shields.io/badge/MCP_Tools-40-orange)](https://github.com/TropinAlexey/ableton-and-max-mcp)
 
 ## Overview
 
-This project gives Claude AI complete programmatic control over Ableton Live and Max for Live through the Model Context Protocol (MCP). Generate music patterns, manage tracks, edit MIDI, control synthesizers, and interact with Max patches—all directly from Claude conversations.
+This project gives any MCP-compatible AI agent complete programmatic control over Ableton Live and Max for Live through the Model Context Protocol (MCP). Generate music patterns, manage tracks, edit MIDI, control synthesizers, and interact with Max patches — all directly from AI conversations.
 
 **Why this matters:**
-- **No GUI clicking** — describe what you want, Claude does it
+- **No GUI clicking** — describe what you want, the AI agent does it
 - **Reproducible workflows** — save and version your music configurations
-- **Real-time collaboration** — Claude can analyze and modify your project live
+- **Real-time collaboration** — your AI assistant can analyze and modify your project live
 - **Pattern generation** — AI-powered MIDI generation (arpeggio, chord, scales, etc.)
 
 ## Performance
@@ -48,9 +52,9 @@ bun install
 bun start
 ```
 
-### Configure Claude Code
+### Configure Your MCP Client
 
-Edit `~/.config/Claude/claude_desktop_config.json`:
+Add the server to your MCP client configuration. Example for a JSON-based config:
 
 ```json
 {
@@ -63,14 +67,20 @@ Edit `~/.config/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Code → 40 tools available!
+Common config locations:
+- **Claude Code / Claude Desktop**: `~/.config/Claude/claude_desktop_config.json`
+- **Cursor**: `.cursor/mcp.json` in your project
+- **VS Code (Copilot)**: `.vscode/mcp.json` in your project
+- **Windsurf**: `~/.codeium/windsurf/mcp_config.json`
+
+Restart your MCP client → 40 tools available!
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Claude AI                            │
-│         (MCP Client / Conversation Interface)            │
+│                   AI Agent (MCP Client)                  │
+│            Any LLM with MCP support                      │
 └─────────────────────────────────────────────────────────┘
                            ↓
                     MCP Protocol 2026-07-28 (JSON-RPC 2.0)
@@ -95,7 +105,7 @@ Restart Claude Code → 40 tools available!
 
 ## Available Tools (40 Total)
 
-### 🎵 Transport Control (6 tools)
+### Transport Control (6 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -104,9 +114,9 @@ Restart Claude Code → 40 tools available!
 | `transport_stop` | Stop playback |
 | `transport_record` | Enable recording mode |
 | `transport_set_tempo` | Set BPM (20-300) |
-| `transport_jump_to` | Jump to bar position |
+| `transport_jump_to` | Jump to beat position (works in any time signature) |
 
-### 🎼 Track Management (13 tools)
+### Track Management (13 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -124,7 +134,7 @@ Restart Claude Code → 40 tools available!
 | `tracks_arm` | Arm for recording |
 | `tracks_disarm` | Disarm recording |
 
-### 📎 Clip Control (7 tools)
+### Clip Control (7 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -136,30 +146,37 @@ Restart Claude Code → 40 tools available!
 | `clips_set_name` | Rename clip |
 | `clips_set_length` | Set clip length in bars |
 
-### 🎹 MIDI Notes + Pattern Generation (5 tools)
+### MIDI Notes + Pattern Generation (5 tools)
 
 | Tool | Description |
 |------|-------------|
-| `notes_get` | Get all notes from clip |
-| `notes_set` | Replace all notes |
-| `notes_add` | Add single note (pitch, time, duration, velocity) |
-| `notes_clear` | Clear all notes |
-| `notes_generate_pattern` | **Generate patterns**: `arpeggio_up`, `arpeggio_down`, `chord` with scales: `major`, `minor`, `pentatonic`, `blues`, `chromatic` |
+| `notes_get` | Get all MIDI notes from a clip |
+| `notes_set` | Replace ALL notes in a clip (destructive) |
+| `notes_add` | Add a single note without removing existing ones |
+| `notes_clear` | Remove ALL notes from a clip (destructive) |
+| `notes_generate_pattern` | Generate patterns with 60+ scales and 30+ chord types |
 
-**Pattern Examples:**
+**Patterns:** `arpeggio_up`, `arpeggio_down`, `chord`, `random`
+
+**Scales (60+):** All 7 modes (ionian–locrian), harmonic/melodic minor, pentatonic, blues, chromatic, whole tone, diminished, augmented, Hungarian, gypsy, phrygian dominant, double harmonic, flamenco, enigmatic, Neapolitan, Persian, Arabic, Japanese (hirajoshi, in-sen, iwato, kumoi, yo), Indian (bhairav, purvi, marwa, todi), bebop, lydian variants, and more.
+
+**Chord types (30+):** power, major/minor/dim/aug triads, sus2/sus4, all seventh chords, sixths, ninths (incl. b9, #9, add9, 6/9), elevenths, thirteenths, dom7#11.
+
+**Custom voicings:** pass `degrees: [1, 3, 5, 7]` to build any chord from scale degrees.
+
+**Example:**
 ```
 notes_generate_pattern(
-  trackIndex: 0,
+  track_index: 0,
+  clip_index: 0,
   pattern: "arpeggio_up",
-  root: 60,           // C4
-  scale: "major",
-  length: 2           // 2 bars
+  root_note: 60,        // C4
+  scale: "dorian",
+  length: 2             // 2 bars
 )
 ```
 
-Generates 16 ascending notes from C major scale.
-
-### ⚙️ Device/FX Control (5 tools)
+### Device/FX Control (5 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -169,7 +186,7 @@ Generates 16 ascending notes from C major scale.
 | `devices_enable` | Turn on device |
 | `devices_disable` | Turn off device |
 
-### 🎛️ Max for Live (4 tools)
+### Max for Live (4 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -180,20 +197,20 @@ Generates 16 ascending notes from C major scale.
 
 ## Usage Examples
 
-### In Claude Conversations
+### In AI Conversations
 
 ```
-Claude: "Create a new MIDI track called 'Bass'"
-→ Uses: tracks_create_midi
+User: "Create a new MIDI track called 'Bass'"
+→ Agent uses: tracks_create_midi
 
 User: "Generate a C major arpeggio over 4 bars"
-→ Uses: notes_generate_pattern (arpeggio_up, C, major, 4 bars)
+→ Agent uses: notes_generate_pattern (arpeggio_up, C, major, 4 bars)
 
 User: "Set the tempo to 140 BPM and play"
-→ Uses: transport_set_tempo, transport_play
+→ Agent uses: transport_set_tempo, transport_play
 
 User: "Create a chord progression with Em, Am, C, G"
-→ Uses: clips_create, notes_generate_pattern (chord) × 4
+→ Agent uses: clips_create, notes_generate_pattern (chord) × 4
 ```
 
 ### Via Command Line
@@ -263,10 +280,10 @@ DEBUG=1 bun start
 ```
 
 **Solutions:**
-- ✓ Check Ableton Live is running
-- ✓ Verify AbletonOSC Remote Script is enabled in Preferences
-- ✓ Check ports 11000-11001 aren't blocked by firewall
-- ✓ Restart Ableton if script doesn't load
+- Check Ableton Live is running
+- Verify AbletonOSC Remote Script is enabled in Preferences
+- Check ports 11000-11001 aren't blocked by firewall
+- Restart Ableton if script doesn't load
 
 ### High Latency
 
@@ -284,12 +301,12 @@ Most latency (2-5ms) comes from Ableton/hardware, not software:
 npm run test:all
 
 # Test output shows:
-# ✅ Transport tests (play, stop, tempo, jump)
-# ✅ Tracks tests (volume, pan, mute, solo, arm)
-# ✅ Clips tests (create, fire, delete)
-# ✅ Notes tests (patterns, scales)
-# ✅ Devices tests (parameters, enable/disable)
-# ✅ Max tests (messaging, parameters)
+# Transport tests (play, stop, tempo, jump)
+# Tracks tests (volume, pan, mute, solo, arm)
+# Clips tests (create, fire, delete)
+# Notes tests (patterns, scales)
+# Devices tests (parameters, enable/disable)
+# Max tests (messaging, parameters)
 ```
 
 ### Building
@@ -331,11 +348,11 @@ Initial release with 42 MCP tools for Ableton Live + Max for Live control.
 - Device discovery across all plugin types
 
 ### Planned Features
-- 🚧 Real-time state streaming (WebSocket)
-- 🚧 Additional pattern generators (groove, random, probabilistic)
-- 🚧 Performance metrics dashboard
-- 🚧 Multi-device synchronization
-- 🚧 Snapshot save/load system
+- Real-time state streaming (WebSocket)
+- Additional pattern generators (groove, random, probabilistic)
+- Performance metrics dashboard
+- Multi-device synchronization
+- Snapshot save/load system
 
 ## Installation of AbletonOSC
 
@@ -343,6 +360,15 @@ Initial release with 42 MCP tools for Ableton Live + Max for Live control.
 2. Extract to: `~/Music/Ableton Library/Remote Scripts/`
 3. Restart Ableton Live
 4. In Preferences → Link/Tempo/MIDI → Control Surface → select **AbletonOSC**
+
+## Compatible MCP Clients
+
+This server works with any MCP-compatible client, including:
+- [Claude Code](https://github.com/anthropics/claude-code) / [Claude Desktop](https://claude.ai)
+- [Cursor](https://cursor.com)
+- [VS Code with GitHub Copilot](https://code.visualstudio.com)
+- [Windsurf](https://codeium.com/windsurf)
+- Any other client implementing the [MCP specification](https://modelcontextprotocol.io)
 
 ## Contributing
 
@@ -359,7 +385,6 @@ MIT © Alexey Tropin
 ## Links
 
 - **GitHub**: https://github.com/TropinAlexey/ableton-and-max-mcp
-- **Claude Code Guide**: https://github.com/anthropics/claude-code
 - **MCP Specification**: https://modelcontextprotocol.io/specification/2026-07-28
 - **Ableton Live API**: https://github.com/gluon/AbletonOSC
 - **Max for Live**: https://www.ableton.com/en/live/max-for-live/
@@ -373,6 +398,6 @@ For issues, feature requests, or questions:
 
 ---
 
-**Made with ❤️ for musicians and AI enthusiasts**
+**Made for musicians and AI enthusiasts**
 
 *This project bridges the gap between traditional DAW workflows and AI-driven creative tools, enabling a new paradigm of human-AI music creation.*

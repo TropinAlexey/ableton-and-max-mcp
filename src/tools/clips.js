@@ -1,51 +1,51 @@
 import { z } from 'zod/v4';
 
 const clipRef = z.object({
-  track_index: z.number(),
-  clip_index: z.number(),
+  track_index: z.number().int().min(0).describe('Track index (0-based)'),
+  clip_index: z.number().int().min(0).describe('Clip slot index (0-based)'),
 });
 
 export const clipsTools = {
   clips_list: {
-    description: 'List clips in track',
+    description: 'List all clips in a track with names, lengths, and positions',
     inputSchema: z.object({
-      track_index: z.number(),
+      track_index: z.number().int().min(0).describe('Track index (0-based)'),
     }),
   },
   clips_create: {
-    description: 'Create clip',
+    description: 'Create a new empty MIDI clip. Use clips_list after to get the actual clip_index.',
     inputSchema: z.object({
-      track_index: z.number(),
-      length: z.number().optional().default(4),
-      name: z.string().optional().default('Clip'),
+      track_index: z.number().int().min(0).describe('Track index (0-based)'),
+      length: z.number().positive().optional().default(4).describe('Clip length in bars (default: 4)'),
+      name: z.string().optional().default('Clip').describe('Clip name'),
     }),
   },
   clips_fire: {
-    description: 'Start playing clip',
+    description: 'Start playing a clip',
     inputSchema: clipRef,
   },
   clips_stop: {
-    description: 'Stop clip',
+    description: 'Stop a playing clip',
     inputSchema: clipRef,
   },
   clips_duplicate: {
-    description: 'Duplicate clip',
+    description: 'Duplicate a clip to the next available slot',
     inputSchema: clipRef,
   },
   clips_set_name: {
-    description: 'Rename clip',
+    description: 'Rename a clip',
     inputSchema: z.object({
-      track_index: z.number(),
-      clip_index: z.number(),
-      name: z.string(),
+      track_index: z.number().int().min(0).describe('Track index (0-based)'),
+      clip_index: z.number().int().min(0).describe('Clip slot index (0-based)'),
+      name: z.string().describe('New clip name'),
     }),
   },
   clips_set_length: {
-    description: 'Set clip length (bars)',
+    description: 'Set clip length in bars',
     inputSchema: z.object({
-      track_index: z.number(),
-      clip_index: z.number(),
-      length: z.number(),
+      track_index: z.number().int().min(0).describe('Track index (0-based)'),
+      clip_index: z.number().int().min(0).describe('Clip slot index (0-based)'),
+      length: z.number().positive().describe('Length in bars'),
     }),
   },
 };
@@ -68,7 +68,7 @@ export async function executeClipsTool(osc, name, input) {
         input.length || 4,
         input.name || 'Clip',
       ]);
-      return { success: true };
+      return { success: true, track_index: ti };
 
     case 'clips_fire':
       osc.send('/live/tracks', [ti, 'clips', ci, 'fire']);
