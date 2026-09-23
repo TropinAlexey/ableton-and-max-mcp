@@ -340,10 +340,11 @@ Initial release with 42 MCP tools for Ableton Live + Max for Live control.
 - Device discovery across all plugin types
 
 ### Planned Features
-- Real-time state streaming (WebSocket)
-- Additional pattern generators (groove, probabilistic)
-- Multi-device synchronization
-- Snapshot save/load system
+- **Streaming state updates** — long-poll or WebSocket for real-time Ableton state (playback, track changes, clip triggers)
+- **Metrics dashboard** — monitor OSC latency, profile hot paths, track request throughput
+- **Additional pattern generators** — groove templates, probabilistic rhythms, generative sequences
+- **Multi-device synchronization** — coordinate multiple Ableton instances or hardware
+- **Snapshot save/load** — capture and restore full project state
 
 ## Installation of AbletonOSC
 
