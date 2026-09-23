@@ -7,13 +7,13 @@ const clipRef = z.object({
 
 export const clipsTools = {
   clips_list: {
-    description: 'List all clips in a track with names, lengths, and positions',
+    description: 'List clip slots in a track with clip_index, name and length in bars. Always call first to resolve clip_index for clips_* and notes_* tools.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
     }),
   },
   clips_create: {
-    description: 'Create a new empty MIDI clip. Use clips_list after to get the actual clip_index.',
+    description: 'Create a new empty MIDI clip with length in bars (default 4). Use clips_list after to get its clip_index, then notes_set/add/generate_pattern to fill it with music.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
       length: z.number().positive().optional().default(4).describe('Clip length in bars (default: 4)'),
@@ -21,19 +21,19 @@ export const clipsTools = {
     }),
   },
   clips_fire: {
-    description: 'Start playing a clip',
+    description: 'Launch (start playing) a clip in Session View. The clip must already exist (see clips_create). Use clips_stop to stop it.',
     inputSchema: clipRef,
   },
   clips_stop: {
-    description: 'Stop a playing clip',
+    description: 'Stop a currently playing clip. Use clips_fire to launch it again.',
     inputSchema: clipRef,
   },
   clips_duplicate: {
-    description: 'Duplicate a clip to the next available slot',
+    description: 'Duplicate a clip into the next available slot on the same track. Use clips_list after to find the new clip_index.',
     inputSchema: clipRef,
   },
   clips_set_name: {
-    description: 'Rename a clip',
+    description: 'Rename a clip. Resolve track_index and clip_index via clips_list first.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
       clip_index: z.number().int().min(0).describe('Clip slot index (0-based)'),
@@ -41,7 +41,7 @@ export const clipsTools = {
     }),
   },
   clips_set_length: {
-    description: 'Set clip length in bars',
+    description: 'Set clip length in bars (not beats). Resolve indices via clips_list first.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
       clip_index: z.number().int().min(0).describe('Clip slot index (0-based)'),

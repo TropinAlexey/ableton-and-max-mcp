@@ -18,9 +18,20 @@ Ableton Live + AbletonOSC Remote Script
 
 - **Entry point**: `src/index.js` — creates `McpServer`, registers all tools, handles graceful shutdown
 - **OSC layer**: `src/osc-client.js` — UDP send/receive, request queue (serialized), health check with TTL cache
+- **State**: `src/state.js` — `AbletonStateManager`: AbletonOSC `start_listen` subscriptions, push handling, cache
+- **Resources**: `src/resources.js` — 6 per-domain MCP resources with `sendResourceUpdated` push (ADR-010)
 - **Tools**: `src/tools/*.js` — each file exports tool configs (Zod v4 schemas) and executor functions
 - **Types**: `src/types.js` — JSDoc type definitions
 - **ADRs**: `docs/adr/` — architectural decision records
+
+## Realtime Resources (ADR-010, Approach A)
+
+- `ableton://song/state` — tempo, playback, loop, metronome, record_mode (автоподписка при старте)
+- `ableton://track/{index}/state` — volume, pan, mute, solo, arm, name (ленивая подписка при read)
+- `ableton://clip/{track}/{clip}/position` — playing_position
+- `ableton://device/{track}/{device}/parameters` — parameter values
+- `ableton://view/state` — selected_track, selected_scene (автоподписка при старте)
+- `ableton://scene/{index}/state` — name, triggered, tempo
 
 ## Tool Modules
 
