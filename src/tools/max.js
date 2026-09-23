@@ -1,40 +1,40 @@
 import { z } from 'zod/v4';
 
 const maxDeviceRef = z.object({
-  track_index: z.number(),
-  device_index: z.number(),
+  track_index: z.number().int().min(0).describe('Track index (0-based)'),
+  device_index: z.number().int().min(0).describe('Max for Live device index (0-based)'),
 });
 
 export const maxTools = {
   max_list_devices: {
-    description: 'List Max for Live devices on track',
+    description: 'List all Max for Live devices on a track',
     inputSchema: z.object({
-      track_index: z.number(),
+      track_index: z.number().int().min(0).describe('Track index (0-based)'),
     }),
   },
   max_send_message: {
-    description: 'Send message to Max device',
+    description: 'Send a raw message to a Max for Live device. The message is passed directly to the Max patch and can modify patch state. Max 1024 characters.',
     inputSchema: z.object({
-      track_index: z.number(),
-      device_index: z.number(),
-      message: z.string(),
+      track_index: z.number().int().min(0).describe('Track index (0-based)'),
+      device_index: z.number().int().min(0).describe('Max for Live device index (0-based)'),
+      message: z.string().max(1024).describe('Message string to send to the Max patch'),
     }),
   },
   max_get_parameter: {
-    description: 'Get Max parameter value',
+    description: 'Get a parameter value from a Max for Live device',
     inputSchema: z.object({
-      track_index: z.number(),
-      device_index: z.number(),
-      parameter: z.string(),
+      track_index: z.number().int().min(0).describe('Track index (0-based)'),
+      device_index: z.number().int().min(0).describe('Max for Live device index (0-based)'),
+      parameter: z.string().max(256).describe('Parameter name'),
     }),
   },
   max_set_parameter: {
-    description: 'Set Max parameter value',
+    description: 'Set a parameter value on a Max for Live device',
     inputSchema: z.object({
-      track_index: z.number(),
-      device_index: z.number(),
-      parameter: z.string(),
-      value: z.number(),
+      track_index: z.number().int().min(0).describe('Track index (0-based)'),
+      device_index: z.number().int().min(0).describe('Max for Live device index (0-based)'),
+      parameter: z.string().max(256).describe('Parameter name'),
+      value: z.number().min(0).max(1).describe('Normalized value 0.0 to 1.0'),
     }),
   },
 };
@@ -61,8 +61,6 @@ export async function executeMaxTool(osc, name, input) {
       };
 
     case 'max_set_parameter':
-      if (input.value < 0 || input.value > 1)
-        return { success: false, error: 'Value must be 0-1' };
       osc.send('/live/tracks', [ti, 'max_devices', di, 'set', input.parameter, input.value]);
       return { success: true };
 

@@ -1,26 +1,11 @@
 import dgram from 'dgram';
 import { EventEmitter } from 'events';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 const DEBUG = process.env.DEBUG === '1';
 const TIMEOUT_MS = 5000;
+const HEALTH_CACHE_TTL_MS = 10000;
 
-// Load Rust native module
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-let osc_native;
-
-try {
-  osc_native = await import(path.join(__dirname, '../native/target/release/osc_native.node'));
-} catch (e) {
-  console.error('[OSC] Warning: Native module not loaded, using JS fallback');
-  console.error('[OSC] Run: cd native && npm run build');
-  osc_native = null;
-}
-
-// JS fallback if native not available
-function jsParseOSC(buffer) {
+function parseOSC(buffer) {
   let pos = 0;
 
   function readString() {
@@ -60,83 +45,69 @@ function jsParseOSC(buffer) {
   return { address, args };
 }
 
-function parseOSC(buffer) {
-  if (osc_native) {
-    try {
-      return osc_native.parse(buffer);
-    } catch (e) {
-      console.error('[OSC] Native parse error:', e);
-      return jsParseOSC(buffer);
+function flattenArgs(args) {
+  const flat = [];
+  for (const arg of args) {
+    if (Array.isArray(arg)) {
+      flat.push(...flattenArgs(arg));
+    } else if (arg !== null && arg !== undefined && typeof arg === 'object' && !Buffer.isBuffer(arg)) {
+      flat.push(...flattenArgs(Object.values(arg)));
+    } else {
+      flat.push(arg);
     }
   }
-  return jsParseOSC(buffer);
+  return flat;
 }
 
-function writeOSC(address, args) {
-  if (osc_native) {
-    try {
-      return osc_native.write(address, args);
-    } catch (e) {
-      console.error('[OSC] Native write error:', e);
-      return writeOSCFallback(address, args);
-    }
-  }
-  return writeOSCFallback(address, args);
-}
+function writeOSC(address, args = []) {
+  const flatArgs = flattenArgs(args);
 
-function writeOSCFallback(address, args = []) {
-  const buf = Buffer.allocUnsafe(4096);
-  let pos = 0;
-
-  const addrBytes = Buffer.from(address + '\0');
-  addrBytes.copy(buf, pos);
-  pos += addrBytes.length;
-  while (pos % 4) buf[pos++] = 0;
+  const addrBuf = Buffer.from(address + '\0');
+  const addrPadded = Buffer.alloc(Math.ceil(addrBuf.length / 4) * 4);
+  addrBuf.copy(addrPadded);
 
   let typeTag = ',';
   const argBuffers = [];
 
-  for (const arg of args) {
-    if (typeof arg === 'number') {
-      if (Number.isInteger(arg)) typeTag += 'i';
-      else typeTag += 'f';
-    } else if (typeof arg === 'string') {
-      typeTag += 's';
-    } else if (Buffer.isBuffer(arg)) {
-      typeTag += 'b';
-    }
-  }
-
-  const typeBytes = Buffer.from(typeTag + '\0');
-  typeBytes.copy(buf, pos);
-  pos += typeBytes.length;
-  while (pos % 4) buf[pos++] = 0;
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+  for (const arg of flatArgs) {
     if (typeof arg === 'number') {
       if (Number.isInteger(arg)) {
-        buf.writeInt32BE(arg, pos);
-        pos += 4;
+        typeTag += 'i';
+        const b = Buffer.alloc(4);
+        b.writeInt32BE(arg, 0);
+        argBuffers.push(b);
       } else {
-        buf.writeFloatBE(arg, pos);
-        pos += 4;
+        typeTag += 'f';
+        const b = Buffer.alloc(4);
+        b.writeFloatBE(arg, 0);
+        argBuffers.push(b);
       }
     } else if (typeof arg === 'string') {
-      const strBytes = Buffer.from(arg + '\0');
-      strBytes.copy(buf, pos);
-      pos += strBytes.length;
-      while (pos % 4) buf[pos++] = 0;
+      typeTag += 's';
+      const strBuf = Buffer.from(arg + '\0');
+      const padded = Buffer.alloc(Math.ceil(strBuf.length / 4) * 4);
+      strBuf.copy(padded);
+      argBuffers.push(padded);
     } else if (Buffer.isBuffer(arg)) {
-      buf.writeInt32BE(arg.length, pos);
-      pos += 4;
-      arg.copy(buf, pos);
-      pos += arg.length;
-      while (pos % 4) buf[pos++] = 0;
+      typeTag += 'b';
+      const lenBuf = Buffer.alloc(4);
+      lenBuf.writeInt32BE(arg.length, 0);
+      const padded = Buffer.alloc(Math.ceil(arg.length / 4) * 4);
+      arg.copy(padded);
+      argBuffers.push(Buffer.concat([lenBuf, padded]));
+    } else if (typeof arg === 'boolean') {
+      typeTag += 'i';
+      const b = Buffer.alloc(4);
+      b.writeInt32BE(arg ? 1 : 0, 0);
+      argBuffers.push(b);
     }
   }
 
-  return buf.subarray(0, pos);
+  const typeBuf = Buffer.from(typeTag + '\0');
+  const typePadded = Buffer.alloc(Math.ceil(typeBuf.length / 4) * 4);
+  typeBuf.copy(typePadded);
+
+  return Buffer.concat([addrPadded, typePadded, ...argBuffers]);
 }
 
 export class AbletonOSCClient extends EventEmitter {
@@ -147,24 +118,43 @@ export class AbletonOSCClient extends EventEmitter {
     this.socket = null;
     this.connected = false;
     this.messageCallbacks = new Map();
-    this.requestId = 0;
+    this.requestQueue = [];
+    this.processing = false;
+    this.healthCacheValid = false;
+    this.healthCacheTime = 0;
   }
 
   async connect() {
     return new Promise((resolve, reject) => {
       this.socket = dgram.createSocket('udp4');
       this.socket.on('message', (msg) => this.handleMessage(msg));
-      this.socket.on('error', reject);
+      this.socket.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          reject(new Error(
+            `Port ${this.incomingPort} already in use. Is another instance running? Check: lsof -i :${this.incomingPort}`
+          ));
+        } else {
+          reject(err);
+        }
+      });
       this.socket.on('listening', () => {
         this.connected = true;
         if (DEBUG) console.error('[OSC] Connected on port', this.incomingPort);
         resolve();
       });
-      this.socket.bind(this.incomingPort);
+      this.socket.bind(this.incomingPort, '127.0.0.1');
     });
   }
 
   disconnect() {
+    for (const { reject } of this.requestQueue) {
+      reject(new Error('OSC client disconnecting'));
+    }
+    this.requestQueue = [];
+    this.processing = false;
+    for (const [address, callback] of this.messageCallbacks) {
+      this.messageCallbacks.delete(address);
+    }
     if (this.socket) {
       this.socket.close();
       this.connected = false;
@@ -199,6 +189,60 @@ export class AbletonOSCClient extends EventEmitter {
 
   async request(address, args = []) {
     return new Promise((resolve, reject) => {
+      this.requestQueue.push({ address, args, resolve, reject });
+      this.processQueue();
+    });
+  }
+
+  processQueue() {
+    if (this.processing || this.requestQueue.length === 0) return;
+    this.processing = true;
+
+    const { address, args, resolve, reject } = this.requestQueue.shift();
+
+    const timeout = setTimeout(() => {
+      this.messageCallbacks.delete(address);
+      this.processing = false;
+      reject(new Error(`OSC timeout: ${address}`));
+      this.processQueue();
+    }, TIMEOUT_MS);
+
+    this.messageCallbacks.set(address, (data) => {
+      clearTimeout(timeout);
+      this.processing = false;
+      resolve(data);
+      this.processQueue();
+    });
+
+    try {
+      this.send(address, args);
+    } catch (e) {
+      clearTimeout(timeout);
+      this.messageCallbacks.delete(address);
+      this.processing = false;
+      reject(e);
+      this.processQueue();
+    }
+  }
+
+  async healthCheck() {
+    const now = Date.now();
+    if (this.healthCacheValid && (now - this.healthCacheTime) < HEALTH_CACHE_TTL_MS) {
+      return true;
+    }
+    try {
+      await this.directRequest('/live/this/is_playing');
+      this.healthCacheValid = true;
+      this.healthCacheTime = now;
+      return true;
+    } catch {
+      this.healthCacheValid = false;
+      return false;
+    }
+  }
+
+  async directRequest(address, args = []) {
+    return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.messageCallbacks.delete(address);
         reject(new Error(`OSC timeout: ${address}`));
@@ -217,15 +261,6 @@ export class AbletonOSCClient extends EventEmitter {
         reject(e);
       }
     });
-  }
-
-  async healthCheck() {
-    try {
-      await this.request('/live/this/is_playing');
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   getConnectionStatus() {

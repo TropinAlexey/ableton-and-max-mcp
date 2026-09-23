@@ -2,7 +2,7 @@ import { z } from 'zod/v4';
 
 export const transportTools = {
   transport_get_state: {
-    description: 'Get transport state (playing, tempo, position)',
+    description: 'Get transport state: playing (bool), tempo (BPM), position (beats)',
     inputSchema: z.object({}),
   },
   transport_play: {
@@ -18,15 +18,15 @@ export const transportTools = {
     inputSchema: z.object({}),
   },
   transport_set_tempo: {
-    description: 'Set tempo (BPM)',
+    description: 'Set tempo in BPM',
     inputSchema: z.object({
-      bpm: z.number().describe('BPM value'),
+      bpm: z.number().positive().describe('BPM value'),
     }),
   },
   transport_jump_to: {
-    description: 'Jump to bar position',
+    description: 'Jump to beat position. Beat 0 = start of song. Works in any time signature.',
     inputSchema: z.object({
-      bar: z.number().describe('Bar number'),
+      beat: z.number().min(0).describe('Beat position (0-based)'),
     }),
   },
 };
@@ -53,18 +53,12 @@ export async function executeTransportTool(osc, name, input) {
       return { success: true };
 
     case 'transport_set_tempo':
-      if (!Number.isFinite(input.bpm) || input.bpm < 20 || input.bpm > 300) {
-        return { success: false, error: 'BPM must be 20-300' };
-      }
       osc.send('/live/song/set/tempo', [input.bpm]);
       return { success: true, bpm: input.bpm };
 
     case 'transport_jump_to':
-      if (!Number.isInteger(input.bar) || input.bar < 0) {
-        return { success: false, error: 'Bar must be non-negative integer' };
-      }
-      osc.send('/live/song/set/current_song_time', [input.bar * 4]);
-      return { success: true, bar: input.bar };
+      osc.send('/live/song/set/current_song_time', [input.beat]);
+      return { success: true, beat: input.beat };
 
     default:
       return { success: false, error: `Unknown tool: ${name}` };
