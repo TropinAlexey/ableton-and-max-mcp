@@ -1,6 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { AbletonOSCClient } from './osc-client.js';
+import { AbletonStateManager } from './state.js';
+import { registerAbletonResources } from './resources.js';
 import { transportTools, executeTransportTool } from './tools/transport.js';
 import { tracksTools, executeTracksTool } from './tools/tracks.js';
 import { clipsTools, executeClipsTool } from './tools/clips.js';
@@ -21,8 +23,21 @@ const toolModules = [
 
 const server = new McpServer({
   name: 'ableton-and-max-mcp',
-  version: '2.0.0',
+  version: '2.1.0',
 });
+
+const state = new AbletonStateManager(osc, (uri) => {
+  // Push-уведомления для resources/subscribe. Игнорируем ошибки,
+  // если клиент не подписан или транспорт ещё не готов.
+  try {
+    const p = server.server.sendResourceUpdated({ uri });
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch {
+    // ignore
+  }
+});
+
+registerAbletonResources(server, osc, state);
 
 async function handleTool(executor, name, args) {
   try {
@@ -82,6 +97,10 @@ async function main() {
     const connected = await osc.healthCheck();
     if (!connected) {
       console.error('Warning: Ableton unreachable. Start with AbletonOSC enabled.');
+    } else {
+      // Автоподписка на song/view — треки/клипы/девайсы/сцены подписываются лениво при read.
+      try { state.ensureSongListening(); } catch { /* ignore */ }
+      try { state.ensureViewListening(); } catch { /* ignore */ }
     }
 
     await serveStdio(server);

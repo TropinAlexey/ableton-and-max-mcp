@@ -7,17 +7,17 @@ const deviceRef = z.object({
 
 export const devicesTools = {
   devices_list: {
-    description: 'List all devices (instruments, effects) on a track with names and enabled status',
+    description: 'List regular instruments and effects on a track with device_index, name and enabled status. For Max for Live devices use max_list_devices instead. Always call first to resolve device_index.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
     }),
   },
   devices_get_parameters: {
-    description: 'Get all parameters of a device with current values',
+    description: 'Get all parameters of a regular device with current values and ranges. Use devices_list first to resolve device_index, then devices_set_parameter to change a value.',
     inputSchema: deviceRef,
   },
   devices_set_parameter: {
-    description: 'Set a device parameter value. Use devices_get_parameters first to see available parameter names and ranges.',
+    description: 'Set a parameter on a regular instrument or effect (normalized value 0.0 to 1.0). Use devices_get_parameters first to see names and ranges. For Max for Live devices use max_set_parameter instead.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
       device_index: z.number().int().min(0).describe('Device index (0-based)'),
@@ -26,11 +26,11 @@ export const devicesTools = {
     }),
   },
   devices_enable: {
-    description: 'Turn on a device (bypass off)',
+    description: 'Turn on a regular device (bypass off) so it processes audio. Use devices_disable to bypass it.',
     inputSchema: deviceRef,
   },
   devices_disable: {
-    description: 'Turn off a device (bypass on). Audio passes through unprocessed.',
+    description: 'Turn off a regular device (bypass on). Audio passes through unprocessed. Use devices_enable to turn it back on.',
     inputSchema: deviceRef,
   },
 };

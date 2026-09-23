@@ -150,11 +150,11 @@ const clipRef = z.object({
 
 export const notesTools = {
   notes_get: {
-    description: 'Get all MIDI notes from a clip',
+    description: 'Get all MIDI notes in a clip (pitch 0-127, time in beats, duration in beats, velocity 0-127). Resolve indices via clips_list first.',
     inputSchema: clipRef,
   },
   notes_set: {
-    description: 'Replace ALL notes in a clip. Existing notes are lost.',
+    description: 'Replace ALL notes in a clip with the given list. Existing notes are lost. For a single extra note use notes_add, for generated music use notes_generate_pattern.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
       clip_index: z.number().int().min(0).describe('Clip slot index (0-based)'),
@@ -167,7 +167,7 @@ export const notesTools = {
     }),
   },
   notes_add: {
-    description: 'Add a single MIDI note to a clip without removing existing notes',
+    description: 'Add one MIDI note to a clip and keep existing notes (pitch 0-127, 60 = C4; time and duration in beats). To replace everything use notes_set, for patterns use notes_generate_pattern.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
       clip_index: z.number().int().min(0).describe('Clip slot index (0-based)'),
@@ -178,11 +178,11 @@ export const notesTools = {
     }),
   },
   notes_clear: {
-    description: 'Remove ALL notes from a clip. Cannot be undone.',
+    description: 'Remove ALL notes from a clip but keep the clip itself. Cannot be undone. To delete the clip use clips tools.',
     inputSchema: clipRef,
   },
   notes_generate_pattern: {
-    description: 'Generate a MIDI pattern and write it to a clip. Replaces existing notes. Patterns: arpeggio_up, arpeggio_down, chord, random. Supports 60+ scales (major modes, harmonic/melodic minor, pentatonic, blues, exotic, Japanese, Indian, bebop) and 30+ chord types (triads, 7ths, 9ths, 11ths, 13ths, sus, power). Use custom degrees for any voicing.',
+    description: 'Generate a MIDI pattern (arpeggio_up, arpeggio_down, chord, random) and write it to a clip, replacing existing notes. Root default 60 = C4, length in bars. Supports 60+ scales and 30+ chord types. For one manual note use notes_add, for a custom note list use notes_set.',
     inputSchema: z.object({
       track_index: z.number().int().min(0).describe('Track index (0-based)'),
       clip_index: z.number().int().min(0).describe('Clip slot index (0-based)'),
